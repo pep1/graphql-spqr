@@ -7,4 +7,5 @@ public class RelayMappingConfig {
     public boolean relayCompliantMutations;
     public String wrapperFieldName;
     public String wrapperFieldDescription;
+    public boolean useClientMutationIds = true;
 }

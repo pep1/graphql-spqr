@@ -316,40 +316,44 @@ public class OperationMapper {
                         .build())
                 .collect(Collectors.toList());
 
-        GraphQLInputObjectType inputObjectType = newInputObject()
+        GraphQLInputObjectType.Builder inputObjectTypeBuilder = newInputObject()
                 .name(mutation.getName() + "Input")
-                .field(newInputObjectField()
-                        .name(CLIENT_MUTATION_ID)
-                        .type(new GraphQLNonNull(GraphQLString)))
-                .fields(inputFields)
-                .build();
+                .fields(inputFields);
 
-        GraphQLObjectType outputType = newObject()
+        GraphQLObjectType.Builder outputTypeBuilder = newObject()
                 .name(payloadTypeName)
-                .field(newFieldDefinition()
-                        .name(CLIENT_MUTATION_ID)
-                        .type(new GraphQLNonNull(GraphQLString)))
-                .fields(outputFields)
-                .build();
+                .fields(outputFields);
 
-        DataFetcher<String> simpleResolver = new PropertyDataFetcher<>(CLIENT_MUTATION_ID);
-        DataFetcher<String> clientMutationIdResolver = env -> {
-            if (env.getContext() instanceof ContextWrapper) {
-                return ((ContextWrapper) env.getContext()).getClientMutationId();
-            } else if (env.getContext() instanceof GraphQLContext) {
-                return ((GraphQLContext) env.getContext()).get(CLIENT_MUTATION_ID);
-            } else {
-                return simpleResolver.get(env);
-            }
-        };
-        buildContext.codeRegistry.dataFetcher(coordinates(payloadTypeName, CLIENT_MUTATION_ID), clientMutationIdResolver);
+        if (buildContext.relayMappingConfig.useClientMutationIds) {
+            inputObjectTypeBuilder = inputObjectTypeBuilder
+                    .field(newInputObjectField()
+                        .name(CLIENT_MUTATION_ID)
+                        .type(new GraphQLNonNull(GraphQLString)));
+
+            outputTypeBuilder = outputTypeBuilder
+                    .field(newFieldDefinition()
+                        .name(CLIENT_MUTATION_ID)
+                        .type(new GraphQLNonNull(GraphQLString)));
+
+            DataFetcher<String> simpleResolver = new PropertyDataFetcher<>(CLIENT_MUTATION_ID);
+            DataFetcher<String> clientMutationIdResolver = env -> {
+                if (env.getContext() instanceof ContextWrapper) {
+                    return ((ContextWrapper) env.getContext()).getClientMutationId();
+                } else if (env.getContext() instanceof GraphQLContext) {
+                    return ((GraphQLContext) env.getContext()).get(CLIENT_MUTATION_ID);
+                } else {
+                    return simpleResolver.get(env);
+                }
+            };
+            buildContext.codeRegistry.dataFetcher(coordinates(payloadTypeName, CLIENT_MUTATION_ID), clientMutationIdResolver);
+        }
 
         final GraphQLFieldDefinition relayMutation = newFieldDefinition()
                 .name(mutation.getName())
-                .type(outputType)
+                .type(outputTypeBuilder.build())
                 .argument(newArgument()
                         .name("input")
-                        .type(new GraphQLNonNull(inputObjectType)))
+                        .type(new GraphQLNonNull(inputObjectTypeBuilder.build())))
                 .build();
 
         DataFetcher<?> wrappedResolver = env -> {
